@@ -123,6 +123,66 @@ Confirm each PR number before merging.
 
 ---
 
+## Step 5.5 — Cross-repo API impact check
+
+Run this step **only when pfm-go was one of the target repos**.
+
+Inspect the merged pfm-go PR diff for API-affecting changes:
+
+```
+gh -R fzambone/pfm-go pr diff <pfm-go-PR-number> --name-only
+```
+
+**API-affecting paths:**
+- `internal/adapter/http/` — handlers, middleware, response mappings
+- `api/swagger.yaml` — spec changes (including docs-only updates)
+
+**If none of these paths appear:** skip silently. Proceed to Step 6.
+
+**If any of these paths appear:**
+
+1. List the affected files.
+2. Extract changed endpoints: scan the diff for `// @Router` annotations or `+func (h *Handler)` lines.
+3. Ask: **"API-affecting changes detected. Create a tracking issue in pfm-ui-react? (y/n)"**
+
+If **no**: skip. Proceed to Step 6.
+
+If **yes**: create the issue:
+
+```
+gh issue create --repo fzambone/pfm-ui-react \
+  --title "API update: sync frontend with pfm-go #<PR-number>" \
+  --body "$(cat <<'EOF'
+## Context
+
+pfm-go PR #<PR-number> (workspace issue fzambone/pfm-workspace#<N>) shipped changes
+that affect the API contract. Frontend may need corresponding updates.
+
+## pfm-go PR
+<PR-url>
+
+## API-affecting files changed
+- <file 1>
+- <file 2>
+...
+
+## Endpoints affected
+- <endpoint or "see diff for details">
+...
+
+## Action required
+Review the pfm-go diff and update:
+- API client calls in `src/`
+- TypeScript types if request/response shapes changed
+- Any UI that surfaces affected endpoints
+EOF
+)"
+```
+
+Note the created issue URL for the Step 8 report.
+
+---
+
 ## Step 6 — Sync main in all repos
 
 For each repo that had changes:
@@ -157,6 +217,7 @@ Per-repo PRs:
 Workspace issue:  closed ✓
 All repos:        main synced ✓
 Business:         PASS
+Frontend impact:  <issue url> created / none detected / skipped
 
 Issue #<N> is done.
 ```
