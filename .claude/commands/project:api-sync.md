@@ -191,37 +191,55 @@ Generate TypeScript interfaces for MISSING or DRIFT endpoints? (y/n)
 
 If **no**: stop here.
 
-If **yes**: ask which endpoints to generate for (default: all MISSING + DRIFT).
+If **yes**: ask which schema names to generate for (default: all MISSING + DRIFT schemas).
 
-For each selected endpoint schema, generate a TypeScript interface:
+### 5.1 Run the generator script
 
-**Rules:**
-- Convert field names from `snake_case` to `camelCase`
-- Map JSON types using the table in Phase 4.1
-- For `array` types, use `<element-type>[]` where element type is `unknown` if unresolved
-- Add a JSDoc comment citing the spec path/method and schema name
-- Output to `src/features/<resource>/types.ts` in pfm-ui-react, where `<resource>` is
-  inferred from the path (e.g., `/api/v1/households/...` → `households`)
+Use the type generation pipeline in pfm-workspace:
 
-**Format:**
-```typescript
-/**
- * Auto-generated from OpenAPI spec.
- * Endpoint: <METHOD> <path>
- * Schema: <spec-schema-name>
- */
-export interface <InterfaceName> {
-  <camelCaseField>: <tsType>;
-  ...
-}
+```bash
+# Generate all interfaces to stdout (preview)
+python3 /Users/fzambone/projects/pfm-workspace/scripts/generate-types.py \
+  --spec /Users/fzambone/projects/go/pfm-go/api/swagger.yaml
+
+# Generate specific interfaces only
+python3 /Users/fzambone/projects/pfm-workspace/scripts/generate-types.py \
+  --spec /Users/fzambone/projects/go/pfm-go/api/swagger.yaml \
+  --only AccountResponse,UserResponse
+
+# Write .generated.ts files to a directory (does not overwrite existing without --force)
+python3 /Users/fzambone/projects/pfm-workspace/scripts/generate-types.py \
+  --spec /Users/fzambone/projects/go/pfm-go/api/swagger.yaml \
+  --output /Users/fzambone/projects/pfm-ui-react/src/features/<resource>
 ```
 
-**Stop before writing.** Show the generated interfaces and ask:
+### 5.2 Script conventions
+
+The script applies pfm-ui-react conventions automatically:
+- `snake_case` field names → `camelCase` (mapping noted in a comment)
+- `integer` → `number`; money fields (`balance`, `amount`, `*_amount`) get a `// minor units (cents/centavos)` comment
+- `$ref` → resolved interface name; arrays of `$ref` → `InterfaceName[]`
+- `nullable: true` / `x-nullable: true` → `T | null`
+- `enum` values → `'val1' | 'val2'` union literals
+- No `any` — unknown shapes render as `Record<string, unknown>`
+
+### 5.3 Review and integrate
+
+The script writes `.generated.ts` files, not `types.ts`. The user reviews the output
+and copies what they need into the feature's `types.ts`:
+
 ```
-Write these interfaces to pfm-ui-react? (y/n)
+.generated.ts   ← script writes here (scratch, not committed)
+types.ts        ← user maintains manually; imports or extends from .generated.ts
 ```
 
-Only write on explicit confirmation.
+**Show the generated output.** Ask:
+```
+Copy these types into pfm-ui-react src/features/<resource>/types.ts? (y/n)
+```
+
+Only write to `types.ts` on explicit confirmation — and only append, never replace
+manually-authored content.
 
 ---
 
